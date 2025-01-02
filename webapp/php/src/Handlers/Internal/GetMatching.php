@@ -14,45 +14,61 @@ class GetMatching extends AbstractHttpHandler
 {
     public function __construct(
         private readonly PDO $db,
-    ) {
-    }
+    ) {}
 
     public function __invoke(
         ServerRequestInterface $request,
         ResponseInterface $response,
     ): ResponseInterface {
-        // MEMO: 一旦最も待たせているリクエストに適当な空いている椅子マッチさせる実装とする。おそらくもっといい方法があるはず…
-        $stmt = $this->db->prepare('SELECT * FROM rides WHERE chair_id IS NULL ORDER BY created_at LIMIT 1');
+        // rides 取得
+        $stmt = $this->db->prepare('SELECT * FROM rides WHERE chair_id IS NULL ORDER BY created_at LIMIT 10');
         $stmt->execute();
-        $ride = $stmt->fetch(PDO::FETCH_ASSOC);
-
-        if (!$ride) {
+        $rides = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        if (count($rides) == 0) {
             return $this->writeNoContent($response);
         }
-        for ($i = 0; $i < 10; $i++) {
-            $stmt = $this->db->prepare(
-                'SELECT * FROM chairs INNER JOIN (SELECT id FROM chairs WHERE is_active = TRUE ORDER BY RAND() LIMIT 1) AS tmp ON chairs.id = tmp.id LIMIT 1'
-            );
-            $stmt->execute();
-            $matched = $stmt->fetch(PDO::FETCH_ASSOC);
-            if (!$matched) {
-                return $this->writeNoContent($response);
+
+        foreach ($rides as $ride) {
+            // chairs 取得
+            $stmt = $this->db->prepare('
+                SELECT
+                    chairs.id, 
+                    ((ABS(lcl.last_latitude - ?) + ABS(lcl.last_longitude - ?)) / cm.speed) + ((ABS(? - ?) + ABS(? - ?)) / cm.speed) AS manhattan FROM chairs 
+                    INNER JOIN last_chair_locations AS lcl ON lcl.chair_id = chairs.id 
+                    INNER JOIN chair_models as cm ON cm.name = chairs.model
+                    LEFT JOIN rides as r ON r.chair_id = chairs.id
+                    LEFT JOIN complete_rides as cr ON cr.ride_id = r.id
+                    WHERE chairs.is_active = TRUE
+                    ORDER BY manhattan ASC
+                    LIMIT 1
+            ');
+            $stmt->execute([$ride['pickup_latitude'], $ride['pickup_longitude'], $ride['destination_latitude'], $ride['pickup_latitude'], $ride['destination_longitude'], $ride['pickup_longitude']]);
+            $chair = $stmt->fetch(PDO::FETCH_ASSOC);
+
+            if (!$chair) {
+                continue;
             }
+
             $stmt = $this->db->prepare(
                 'SELECT COUNT(*) = 0 FROM (SELECT COUNT(chair_sent_at) = 6 AS completed FROM ride_statuses WHERE ride_id IN (SELECT id FROM rides WHERE chair_id = ?) GROUP BY ride_id) is_completed WHERE completed = FALSE'
             );
-            $stmt->execute([$matched['id']]);
+            $stmt->execute([$chair['id']]);
             $result = $stmt->fetch(PDO::FETCH_ASSOC);
             $empty = $result['COUNT(*) = 0'];
             if ($empty) {
-                break;
+                $stmt = $this->db->prepare('UPDATE rides SET chair_id = ? WHERE id = ?');
+                $stmt->execute([$chair['id'], $ride['id']]);
+                // $stmt = $this->db->prepare('UPDATE chairs SET is_active = FALSE WHERE id = ?');
+                // $stmt->execute([$chair['id']]);
             }
+            // $stmt = $this->db->prepare('SELECT * FROM complete_rides INNER JOIN rides ON rides.id = complete_rides.ride_id INNER JOIN chairs ON chairs.id = rides.chair_id WHERE chairs.id = ?');
+            // $stmt->execute([$chair['id']]);
+            // $completed = $stmt->fetch(PDO::FETCH_ASSOC);
+            // if ($completed && $completed['completed'] == FALSE) {
+            //     continue;
+            // }
         }
-        if (!$empty) {
-            return $this->writeNoContent($response);
-        }
-        $stmt = $this->db->prepare('UPDATE rides SET chair_id = ? WHERE id = ?');
-        $stmt->execute([$matched['id'], $ride['id']]);
+
         return $this->writeNoContent($response);
     }
 }
