@@ -1,0 +1,7 @@
+matching_groups:
+  - /api/app/rides
+  - /api/app/rides/[^/]+/evaluation
+  - /api/chair/rides/[^/]+/status
+sort: sum
+reverse: true
+filters: Uri startsWith '/api'

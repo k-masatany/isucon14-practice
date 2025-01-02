@@ -69,4 +69,4 @@ https://qiita.com/tsuzuki_takaaki/items/8d18ddb7698f0644c89e
 
 ### ベンチマーク実行後は alp による解析を実施
 
-sudo alp ltsv --file /var/log/nginx/access.log > alp/$(date +"%Y%m%d%H%M%S").txt
+sudo alp ltsv --config alp.yml --file /var/log/nginx/access.log > alp/$(date +"%Y%m%d%H%M%S").txt
