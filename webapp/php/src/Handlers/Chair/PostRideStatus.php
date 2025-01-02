@@ -43,86 +43,60 @@ class PostRideStatus extends AbstractHttpHandler
             );
         }
 
-        $this->db->beginTransaction();
-        try {
-            $stmt = $this->db->prepare(
-                'SELECT * FROM rides WHERE id = ? FOR UPDATE'
+        $nextStatus = $req->getStatus();
+        if ($nextStatus !== 'ENROUTE' && $nextStatus !== 'CARRYING') {
+            return (new ErrorResponse())->write(
+                $response,
+                StatusCodeInterface::STATUS_BAD_REQUEST,
+                new HttpBadRequestException(
+                    request: $request,
+                    message: 'invalid status'
+                )
             );
-            $stmt->execute([$rideId]);
+        }
+
+        $ride = null;
+        if ($nextStatus === 'ENROUTE') {
+            $stmt = $this->db->prepare(
+                'SELECT * FROM rides WHERE id = ? AND chair_id = ?'
+            );
+            $stmt->execute([$rideId, $chair->id]);
             $ride = $stmt->fetch(PDO::FETCH_ASSOC);
             if (!$ride) {
-                $this->db->rollBack();
                 return (new ErrorResponse())->write(
                     $response,
                     StatusCodeInterface::STATUS_NOT_FOUND,
                     new Exception('ride not found')
                 );
             }
-
-            if ($ride['chair_id'] !== $chair->id) {
-                $this->db->rollBack();
+        } else if ($nextStatus === 'CARRYING') {
+            $stmt = $this->db->prepare('SELECT * FROM rides WHERE id = ? AND chair_id = ? AND status = "PICKUP"');
+            $stmt->execute([$rideId, $chair->id]);
+            $ride = $stmt->fetch(PDO::FETCH_ASSOC);
+            if (!$ride) {
                 return (new ErrorResponse())->write(
                     $response,
                     StatusCodeInterface::STATUS_BAD_REQUEST,
                     new HttpBadRequestException(
                         request: $request,
-                        message: 'not assigned to this ride'
+                        message: 'chair has not arrived yet'
                     )
                 );
             }
-            switch ($req->getStatus()) {
-                    // Acknowledge the ride
-                case 'ENROUTE':
-                    $stmt = $this->db->prepare(
-                        'INSERT INTO ride_statuses (id, ride_id, status) VALUES (?, ?, ?)'
-                    );
-                    $stmt->execute([new Ulid(), $ride['id'], 'ENROUTE']);
-                    $stmt = $this->db->prepare('UPDATE rides set status = ? WHERE id = ?');
-                    $stmt->execute(['ENROUTE', $rideId]);
-                    break;
-                    // After Picking up user
-                case 'CARRYING':
-                    $status = $ride['status'];
-                    if ($status !== 'PICKUP') {
-                        $this->db->rollBack();
-                        return (new ErrorResponse())->write(
-                            $response,
-                            StatusCodeInterface::STATUS_BAD_REQUEST,
-                            new HttpBadRequestException(
-                                request: $request,
-                                message: 'chair has not arrived yet'
-                            )
-                        );
-                    }
-                    $stmt = $this->db->prepare(
-                        'INSERT INTO ride_statuses (id, ride_id, status) VALUES (?, ?, ?)'
-                    );
-                    $stmt->execute([new Ulid(), $ride['id'], 'CARRYING']);
-                    $stmt = $this->db->prepare('UPDATE rides set status = ? WHERE id = ?');
-                    $stmt->execute(['CARRYING', $rideId]);
-                    break;
-                default:
-                    $this->db->rollBack();
-                    return (new ErrorResponse())->write(
-                        $response,
-                        StatusCodeInterface::STATUS_BAD_REQUEST,
-                        new HttpBadRequestException(
-                            request: $request,
-                            message: 'invalid status'
-                        )
-                    );
-            }
-            $this->db->commit();
-            return $this->writeNoContent($response);
-        } catch (PDOException $e) {
-            if ($this->db->inTransaction()) {
-                $this->db->rollBack();
-            }
-            return (new ErrorResponse())->write(
-                $response,
-                StatusCodeInterface::STATUS_INTERNAL_SERVER_ERROR,
-                $e
-            );
         }
+
+        if ($nextStatus === 'ENROUTE') {
+            $stmt = $this->db->prepare('INSERT INTO ride_statuses (id, ride_id, status) VALUES (?, ?, ?)');
+            $stmt->execute([new Ulid(), $ride['id'], 'ENROUTE']);
+            $stmt = $this->db->prepare('UPDATE rides set status = ? WHERE id = ?');
+            $stmt->execute(['ENROUTE', $rideId]);
+        } else if ($nextStatus === 'CARRYING') {
+            $stmt = $this->db->prepare('INSERT INTO ride_statuses (id, ride_id, status) VALUES (?, ?, ?)');
+            $stmt->execute([new Ulid(), $ride['id'], 'CARRYING']);
+            $stmt = $this->db->prepare('UPDATE rides set status = ? WHERE id = ?');
+            $stmt->execute(['CARRYING', $rideId]);
+        }
+
+        return $this->writeNoContent($response);
     }
 }
