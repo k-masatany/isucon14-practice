@@ -25,8 +25,7 @@ class GetSales extends AbstractHttpHandler
 {
     public function __construct(
         private readonly PDO $db,
-    ) {
-    }
+    ) {}
 
     /**
      * @param ServerRequestInterface $request
@@ -113,7 +112,7 @@ class GetSales extends AbstractHttpHandler
                 SELECT rides.*
                     FROM rides
                     JOIN ride_statuses ON rides.id = ride_statuses.ride_id
-                WHERE chair_id = ? AND status = \'COMPLETED\' AND updated_at BETWEEN ? AND ?  + INTERVAL 999 MICROSECOND'
+                WHERE chair_id = ? AND ride_statuses.status = \'COMPLETED\' AND updated_at BETWEEN ? AND ?  + INTERVAL 999 MICROSECOND'
                 );
                 $stmt->execute([$chair->id, $since->format('Y-m-d H:i:s.v'), $until->format('Y-m-d H:i:s.v')]);
                 $rides = $stmt->fetchAll(PDO::FETCH_ASSOC);

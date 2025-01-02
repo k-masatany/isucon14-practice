@@ -21,8 +21,7 @@ class PostRideStatus extends AbstractHttpHandler
 {
     public function __construct(
         private readonly PDO $db,
-    ) {
-    }
+    ) {}
 
     public function __invoke(
         ServerRequestInterface $request,
@@ -72,16 +71,18 @@ class PostRideStatus extends AbstractHttpHandler
                 );
             }
             switch ($req->getStatus()) {
-                // Acknowledge the ride
+                    // Acknowledge the ride
                 case 'ENROUTE':
                     $stmt = $this->db->prepare(
                         'INSERT INTO ride_statuses (id, ride_id, status) VALUES (?, ?, ?)'
                     );
                     $stmt->execute([new Ulid(), $ride['id'], 'ENROUTE']);
+                    $stmt = $this->db->prepare('UPDATE rides set status = ? WHERE id = ?');
+                    $stmt->execute(['ENROUTE', $rideId]);
                     break;
-                // After Picking up user
+                    // After Picking up user
                 case 'CARRYING':
-                    $status = $this->getLatestRideStatus($this->db, $ride['id']);
+                    $status = $ride['status'];
                     if ($status !== 'PICKUP') {
                         $this->db->rollBack();
                         return (new ErrorResponse())->write(
@@ -97,6 +98,8 @@ class PostRideStatus extends AbstractHttpHandler
                         'INSERT INTO ride_statuses (id, ride_id, status) VALUES (?, ?, ?)'
                     );
                     $stmt->execute([new Ulid(), $ride['id'], 'CARRYING']);
+                    $stmt = $this->db->prepare('UPDATE rides set status = ? WHERE id = ?');
+                    $stmt->execute(['CARRYING', $rideId]);
                     break;
                 default:
                     $this->db->rollBack();

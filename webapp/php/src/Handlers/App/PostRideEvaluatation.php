@@ -26,8 +26,7 @@ class PostRideEvaluatation extends AbstractHttpHandler
     public function __construct(
         private readonly PDO $db,
         private readonly PostPayment $postPayment
-    ) {
-    }
+    ) {}
 
     /**
      * @param ServerRequestInterface $request
@@ -103,7 +102,8 @@ class PostRideEvaluatation extends AbstractHttpHandler
                 'INSERT INTO ride_statuses (id, ride_id, status) VALUES (?, ?, ?)'
             );
             $stmt->execute([(string)$statusID, $rideId, 'COMPLETED']);
-
+            $stmt = $this->db->prepare('UPDATE rides set status = ? WHERE id = ?');
+            $stmt->execute(['COMPLETED', $rideId]);
             $stmt = $this->db->prepare('SELECT * FROM rides WHERE id = ?');
             $stmt->execute([$rideId]);
             $result = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -179,18 +179,18 @@ class PostRideEvaluatation extends AbstractHttpHandler
                         }
                         $rides = [];
                         foreach ($result as $row) {
-                             $rides[] = new Ride(
-                                 id: $row['id'],
-                                 userId: $row['user_id'],
-                                 chairId: $row['chair_id'],
-                                 pickupLatitude: $row['pickup_latitude'],
-                                 pickupLongitude: $row['pickup_longitude'],
-                                 destinationLatitude: $row['destination_latitude'],
-                                 destinationLongitude: $row['destination_longitude'],
-                                 evaluation: $row['evaluation'],
-                                 createdAt: $row['created_at'],
-                                 updatedAt: $row['updated_at']
-                             );
+                            $rides[] = new Ride(
+                                id: $row['id'],
+                                userId: $row['user_id'],
+                                chairId: $row['chair_id'],
+                                pickupLatitude: $row['pickup_latitude'],
+                                pickupLongitude: $row['pickup_longitude'],
+                                destinationLatitude: $row['destination_latitude'],
+                                destinationLongitude: $row['destination_longitude'],
+                                evaluation: $row['evaluation'],
+                                createdAt: $row['created_at'],
+                                updatedAt: $row['updated_at']
+                            );
                         }
                         return new \IsuRide\Result\Ride($rides);
                     }

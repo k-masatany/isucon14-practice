@@ -23,8 +23,7 @@ class PostRides extends AbstractHttpHandler
 {
     public function __construct(
         private readonly PDO $db,
-    ) {
-    }
+    ) {}
 
     /**
      * @param ServerRequestInterface $request
@@ -105,7 +104,8 @@ SQL
 
             $stmt = $this->db->prepare('INSERT INTO ride_statuses (id, ride_id, status) VALUES (?, ?, ?)');
             $stmt->execute([(new Ulid())->toString(), (string)$rideId, 'MATCHING']);
-
+            $stmt = $this->db->prepare('UPDATE rides set status = ? WHERE id = ?');
+            $stmt->execute(['MATCHING', (string)$rideId]);
             $stmt = $this->db->prepare('SELECT COUNT(*) FROM rides WHERE user_id = ?');
             $stmt->execute([$user->id]);
             $rideCount = $stmt->fetchColumn(0);

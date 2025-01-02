@@ -57,7 +57,7 @@ CREATE TABLE
     longitude INTEGER NOT NULL COMMENT '緯度',
     created_at DATETIME (6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) COMMENT '登録日時',
     PRIMARY KEY (id),
-    INDEX idx_chair_id_created_at (chair_id, created_at)
+    INDEX idx_chair_id_created_at (chair_id, created_at DESC)
   ) COMMENT = '椅子の現在位置情報テーブル';
 
 -- 利用者情報テーブル
@@ -109,9 +109,19 @@ CREATE TABLE
     evaluation INTEGER DEFAULT NULL COMMENT '評価',
     created_at DATETIME (6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) COMMENT '要求日時',
     updated_at DATETIME (6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6) COMMENT '状態更新日時',
+    status ENUM (
+      'MATCHING',
+      'ENROUTE',
+      'PICKUP',
+      'CARRYING',
+      'ARRIVED',
+      'COMPLETED'
+    ) DEFAULT 'MATCHING' NOT NULL COMMENT '状態',
     PRIMARY KEY (id),
     INDEX idx_user_id_created_at (user_id, created_at),
-    INDEX idx_chair_id (chair_id)
+    INDEX idx_chair_id (chair_id),
+    INDEX idx_status_id (status),
+    INDEX idx_updated_at_desc (updated_at DESC)
   ) COMMENT = 'ライド情報テーブル';
 
 -- ライドステータスの変更履歴テーブル
@@ -134,7 +144,7 @@ CREATE TABLE
     chair_sent_at DATETIME (6) DEFAULT NULL COMMENT '椅子への状態通知日時',
     PRIMARY KEY (id),
     INDEX idx_ride_id_status (ride_id, status),
-    INDEX idx_created_at (created_at)
+    INDEX idx_created_at_desc (created_at DESC)
   ) COMMENT = 'ライドステータスの変更履歴テーブル';
 
 -- 椅子のオーナー情報テーブル
