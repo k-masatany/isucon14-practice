@@ -22,8 +22,7 @@ class GetNearbyChairs extends AbstractHttpHandler
 {
     public function __construct(
         private readonly PDO $db,
-    ) {
-    }
+    ) {}
 
     /**
      * @param ServerRequestInterface $request
@@ -81,54 +80,27 @@ class GetNearbyChairs extends AbstractHttpHandler
         ]);
         try {
             $this->db->beginTransaction();
-            $stmt = $this->db->prepare('SELECT * FROM chairs');
+            $stmt = $this->db->prepare('SELECT chairs.*, lcl.last_id, lcl.last_latitude, lcl.last_longitude, lcl.last_created_at  FROM chairs INNER JOIN last_chair_locations AS lcl ON lcl.chair_id = chairs.id LEFT JOIN rides ON rides.chair_id = chairs.id WHERE is_active = TRUE AND (rides.id IS NULL OR rides.status = "COMPLETED")');
             $stmt->execute();
             $chairs = $stmt->fetchAll(PDO::FETCH_ASSOC);
             $nearbyChairs = [];
-            foreach ($chairs as $chair) {
+            foreach ($chairs as $dbChair) {
                 $chair = new Chair(
-                    id: $chair['id'],
-                    ownerId: $chair['owner_id'],
-                    name: $chair['name'],
-                    accessToken: $chair['access_token'],
-                    model: $chair['model'],
-                    isActive: (bool)$chair['is_active'],
-                    createdAt: $chair['created_at'],
-                    updatedAt: $chair['updated_at']
+                    id: $dbChair['id'],
+                    ownerId: $dbChair['owner_id'],
+                    name: $dbChair['name'],
+                    accessToken: $dbChair['access_token'],
+                    model: $dbChair['model'],
+                    isActive: (bool)$dbChair['is_active'],
+                    createdAt: $dbChair['created_at'],
+                    updatedAt: $dbChair['updated_at']
                 );
-                if (!$chair->isActive) {
-                    continue;
-                }
-                $stmt = $this->db->prepare('SELECT * FROM rides WHERE chair_id = ? ORDER BY created_at DESC');
-                $stmt->execute([$chair->id]);
-                $skip = false;
-                while($ride = $stmt->fetch(PDO::FETCH_ASSOC)){
-                    // 過去にライドが存在し、かつ、それが完了していない場合はスキップ
-                    $status = $this->getLatestRideStatus($this->db, $ride['id']);
-                    if ($status !== 'COMPLETED') {
-                        $skip = true;
-                        break;
-                    }
-                }
-                if ($skip) {
-                    continue;
-                }
-
-                // 最新の位置情報を取得
-                $stmt = $this->db->prepare(
-                    'SELECT * FROM chair_locations WHERE chair_id = ? ORDER BY created_at DESC LIMIT 1'
-                );
-                $stmt->execute([$chair->id]);
-                $chairLocationResult = $stmt->fetch(PDO::FETCH_ASSOC);
-                if (!$chairLocationResult) {
-                    continue;
-                }
                 $chairLocation = new ChairLocation(
-                    id: $chairLocationResult['id'],
-                    chairId: $chairLocationResult['chair_id'],
-                    latitude: $chairLocationResult['latitude'],
-                    longitude: $chairLocationResult['longitude'],
-                    createdAt: $chairLocationResult['created_at']
+                    id: $dbChair['last_id'],
+                    chairId: $dbChair['id'],
+                    latitude: (int)$dbChair['last_latitude'],
+                    longitude: (int)$dbChair['last_longitude'],
+                    createdAt: $dbChair['last_created_at']
                 );
                 $distanceToChair = $this->calculateDistance(
                     $coordinate->getLatitude(),
