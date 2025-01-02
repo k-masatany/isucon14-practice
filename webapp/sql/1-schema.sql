@@ -121,6 +121,7 @@ CREATE TABLE
     INDEX idx_user_id_created_at (user_id, created_at),
     INDEX idx_chair_id (chair_id),
     INDEX idx_status_id (status),
+    INDEX idx_created_at_desc (created_at DESC),
     INDEX idx_updated_at_desc (updated_at DESC)
   ) COMMENT = 'ライド情報テーブル';
 
@@ -180,3 +181,48 @@ CREATE TABLE
     INDEX idx_user_id_created_at (user_id, created_at),
     INDEX idx_used_by (used_by)
   ) COMMENT 'クーポンテーブル';
+
+DROP VIEW IF EXISTS last_chair_locations;
+CREATE ALGORITHM = UNDEFINED DEFINER = `isucon` @`%` SQL SECURITY DEFINER VIEW `last_chair_locations` AS
+select
+    `chair_locations`.`chair_id` AS `chair_id`,
+    substr(
+        max(
+            concat(
+                `chair_locations`.`created_at`,
+                `chair_locations`.`id`
+            )
+        ),
+        27
+    ) AS `last_id`,
+    substr(
+        max(
+            concat(
+                `chair_locations`.`created_at`,
+                `chair_locations`.`latitude`
+            )
+        ),
+        27
+    ) AS `last_latitude`,
+    substr(
+        max(
+            concat(
+                `chair_locations`.`created_at`,
+                `chair_locations`.`longitude`
+            )
+        ),
+        27
+    ) AS `last_longitude`,
+    max(created_at) AS last_created_at
+from `chair_locations`
+group by
+    `chair_locations`.`chair_id`;
+
+DROP VIEW IF EXISTS complete_rides;
+CREATE ALGORITHM = UNDEFINED DEFINER = `isucon` @`%` SQL SECURITY DEFINER VIEW `complete_rides` AS
+select
+    `ride_statuses`.`ride_id` AS `ride_id`,
+    count(`ride_statuses`.`chair_sent_at`) = 6 AS completed
+from `ride_statuses`
+group by
+    `ride_statuses`.`ride_id`;

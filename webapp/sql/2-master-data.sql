@@ -62,3 +62,5 @@ VALUES ('リラックスシート NEO', 2),
        ('タイタンフレーム ULTRA', 7),
        ('ヴァーチェア SUPREME', 7),
        ('オブシディアン PRIME', 7);
+
+INSERT INTO matching_service_status (status) VALUES ('STAND_BY');
