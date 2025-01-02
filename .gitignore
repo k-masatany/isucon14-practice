@@ -1,0 +1,7 @@
+.*
+!.gitignore
+local
+webapp/payment_mock
+webapp/public
+webapp/openapi.yaml
+go
